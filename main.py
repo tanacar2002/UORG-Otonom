@@ -1,6 +1,5 @@
 import asyncio
 import math as m
-from turtle import position
 from mavsdk import System
 from mavsdk import mission_raw as mr
 """ N
@@ -31,6 +30,7 @@ triangle = [(0,0,5)
         ,(5/2,5*m.sqrt(3)/2,5)
         ,(5,0,5)]
 spoints =[*triangle,*triangle,*triangle,*triangle,*triangle
+        ,*triangle,*triangle,*triangle,*triangle
         ,(0,0,5)]
 first_mission_items = []
 f_mis_complete = False
@@ -70,6 +70,17 @@ async def main():
     termination_task = asyncio.ensure_future(
         observe_is_in_air(drone, running_tasks))
 
+    async for mode in getFlightMode():
+        if (mode == "HOLD") or True:# or True
+            print("Phase 1")
+            break
+    #If we want to have the coordinates from the start cmd
+    # async for pos in drone.telemetry.position():
+    #     global position
+    #     position = pos
+    #     print(pos)
+    #     break
+
     for i,point in enumerate(fpoints):
         add_WP(first_mission_items,point[0]*m.cos(angle)-point[1]*m.sin(angle),point[1]*m.cos(angle)+point[0]*m.sin(angle),point[2],i)
 
@@ -80,7 +91,6 @@ async def main():
 
     add_LAND(second_mission_items,spoints[-1][0]*m.cos(angle)-spoints[-1][1]*m.sin(angle),spoints[-1][1]*m.cos(angle)+spoints[-1][0]*m.sin(angle),spoints[-1][2],len(spoints)+1)
 
-    print("Phase 1")
     await drone.mission_raw.upload_mission(first_mission_items)
     
     async for arm_state in drone.telemetry.armed():
@@ -107,6 +117,11 @@ async def getPass():
     while True:
         await asyncio.sleep(0.1)
         yield f_mis_complete
+
+async def getFlightMode():
+    while True:
+        await asyncio.sleep(0.1)
+        yield flight_mode
 
 async def print_mission_progress(drone):
     async for mission_progress in drone.mission_raw.mission_progress():
@@ -146,6 +161,7 @@ def add_LAND(l,x,y,z,seq):
 
 async def flight_mode_handler(drone):
     async for f_mode in drone.telemetry.flight_mode():
+        global flight_mode
         flight_mode = f_mode
 
 async def observe_is_in_air(drone, running_tasks):
