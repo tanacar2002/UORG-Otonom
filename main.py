@@ -25,22 +25,31 @@ fpoints =[(0,0,2)
         ,(5,0,7)
         ,(0,0,7)
         ,(0,0,5)]
-sroi = (5/2,5*m.sqrt(3)/6,5)
+sroi = (15/4,5*m.sqrt(3)/12,5)#(5/2,5*m.sqrt(3)/6,5)
+rois = [(15/4,5*m.sqrt(3)/12,5)
+        ,(5/4,5*m.sqrt(3)/12,5)
+        ,(5/2,5*m.sqrt(3)/3,5)]
 triangle = [(0,0,5)
         ,(5/2,5*m.sqrt(3)/2,5)
         ,(5,0,5)]
 spoints =[*triangle,*triangle,*triangle,*triangle,*triangle
-        ,*triangle,*triangle,*triangle,*triangle
+        ,*triangle,*triangle
         ,(0,0,5)]
+#stay away from the walls
+for point in [*fpoints,*spoints]:
+    npoint = (point[0]+2.5,point[1]+2.5,point[2])
+    point = npoint
+
 first_mission_items = []
 f_mis_complete = False
 second_mission_items = []
 position = None
 flight_mode = ""
 async def main():
+    global sroi
     drone = System()
     print("Connecting to the drone")
-    await drone.connect(system_address="udp://:14540")#udp://:14540
+    await drone.connect(system_address="udp://:14540")#serial:///dev/ttyAMA0:921600
 
     print("Waiting for connection")
     async for state in drone.core.connection_state():
@@ -69,9 +78,9 @@ async def main():
     running_tasks = [print_mission_progress_task,f_mode_task]
     termination_task = asyncio.ensure_future(
         observe_is_in_air(drone, running_tasks))
-
-    async for mode in getFlightMode():
-        if (mode == "HOLD") or True:# or True
+    
+    async for param in getParam(drone):
+        if (param >= 2.5)# or True:# for sim
             print("Phase 1")
             break
     #If we want to have the coordinates from the start cmd
@@ -85,11 +94,17 @@ async def main():
         add_WP(first_mission_items,point[0]*m.cos(angle)-point[1]*m.sin(angle),point[1]*m.cos(angle)+point[0]*m.sin(angle),point[2],i)
 
     add_ROI(second_mission_items,sroi[0]*m.cos(angle)-sroi[1]*m.sin(angle),sroi[1]*m.cos(angle)+sroi[0]*m.sin(angle),sroi[2],0)
+    #add_LimSpeed(second_mission_items,0.5,1)
+    j = 1
+    for point in spoints:
+            add_WP(second_mission_items,point[0]*m.cos(angle)-point[1]*m.sin(angle),point[1]*m.cos(angle)+point[0]*m.sin(angle),point[2],j)
+            j += 1
+            k = ((j//2)%3)-1
+            sroi = rois[k]  
+            add_ROI(second_mission_items,sroi[0]*m.cos(angle)-sroi[1]*m.sin(angle),sroi[1]*m.cos(angle)+sroi[0]*m.sin(angle),sroi[2],j)
+            j += 1
 
-    for i,point in enumerate(spoints):
-            add_WP(second_mission_items,point[0]*m.cos(angle)-point[1]*m.sin(angle),point[1]*m.cos(angle)+point[0]*m.sin(angle),point[2],i+1)
-
-    add_LAND(second_mission_items,spoints[-1][0]*m.cos(angle)-spoints[-1][1]*m.sin(angle),spoints[-1][1]*m.cos(angle)+spoints[-1][0]*m.sin(angle),spoints[-1][2],len(spoints)+1)
+    add_LAND(second_mission_items,spoints[-1][0]*m.cos(angle)-spoints[-1][1]*m.sin(angle),spoints[-1][1]*m.cos(angle)+spoints[-1][0]*m.sin(angle),spoints[-1][2],j)
 
     await drone.mission_raw.upload_mission(first_mission_items)
     
@@ -112,6 +127,12 @@ async def main():
     await drone.mission_raw.start_mission()
 
     await termination_task
+
+async def getParam(drone):
+    while True:
+        await asyncio.sleep(0.1)
+        yield await drone.param.get_param_float("MIS_TAKEOFF_ALT")
+
 
 async def getPass():
     while True:
@@ -158,6 +179,11 @@ def add_LAND(l,x,y,z,seq):
                             int((position.latitude_deg + meter_to_degree(y))*1e7),
                             int((position.longitude_deg + correct_longitude(meter_to_degree(x),position.latitude_deg))*1e7),
                             z,0))
+
+def add_LimSpeed(l,speed,seq):
+    l.append(mr.MissionItem(seq,2,178,0 if seq else 1,1,
+                            0,speed,-1,0,
+                            0,0,0,0))
 
 async def flight_mode_handler(drone):
     async for f_mode in drone.telemetry.flight_mode():
