@@ -9,49 +9,14 @@ W-------E
  180|270
 """ 
 angle = 0 * m.pi / 180 #Angle from North to West
-pts1 =[(0,0,2)
-        ,(0,0,7)
-        ,(0,5,7)
-        ,(0,5,2)
-        ,(0,0,2)
-        ,(5,0,2)
-        ,(5,5,2)
-        ,(0,5,2)
-        ,(0,5,7)
-        ,(5,5,7)
-        ,(5,5,2)
-        ,(5,0,2)
-        ,(5,0,7)
-        ,(5,5,7)
-        ,(5,0,7)
-        ,(0,0,7)
-        ,(0,0,5)]
+fpoints =[(0,0,2)
+        ,(0,0,5)
+        ,(0,0,2)]
 PIN = 12
-sroi = (15/4,5*m.sqrt(3)/12,5)#(5/2,5*m.sqrt(3)/6,5)
-rois = [(15/4,5*m.sqrt(3)/12,5)
-        ,(5/4,5*m.sqrt(3)/12,5)
-        ,(5/2,5*m.sqrt(3)/3,5)]
-triangle = [(0,0,5)
-        ,(5/2,5*m.sqrt(3)/2,5)
-        ,(5,0,5)]
-pts2 =[*triangle,*triangle,*triangle,*triangle,*triangle
-        ,*triangle,*triangle
-        ,(0,0,5)]
 
-fpoints = []
-spoints = []
-#stay away from the walls
-for point in pts1:
-    npoint = (point[0]+2.5,point[1]+2.5,point[2])
-    fpoints.append(npoint)
-
-for point in pts2:
-    npoint = (point[0]+2.5,point[1]+2.5,point[2])
-    spoints.append(npoint)
 
 first_mission_items = []
 f_mis_complete = False
-second_mission_items = []
 position = None
 flight_mode = ""
 async def main():
@@ -107,19 +72,6 @@ async def main():
     for i,point in enumerate(fpoints):
         add_WP(first_mission_items,point[0]*m.cos(angle)-point[1]*m.sin(angle),point[1]*m.cos(angle)+point[0]*m.sin(angle),point[2],i)
 
-    add_ROI(second_mission_items,sroi[0]*m.cos(angle)-sroi[1]*m.sin(angle),sroi[1]*m.cos(angle)+sroi[0]*m.sin(angle),sroi[2],0)
-    #add_LimSpeed(second_mission_items,0.5,1)
-    j = 1
-    for point in spoints:
-            add_WP(second_mission_items,point[0]*m.cos(angle)-point[1]*m.sin(angle),point[1]*m.cos(angle)+point[0]*m.sin(angle),point[2],j)
-            j += 1
-            k = ((j//2)%3)-1
-            sroi = rois[k]  
-            add_ROI(second_mission_items,sroi[0]*m.cos(angle)-sroi[1]*m.sin(angle),sroi[1]*m.cos(angle)+sroi[0]*m.sin(angle),sroi[2],j)
-            j += 1
-
-    add_LAND(second_mission_items,spoints[-1][0]*m.cos(angle)-spoints[-1][1]*m.sin(angle),spoints[-1][1]*m.cos(angle)+spoints[-1][0]*m.sin(angle),spoints[-1][2],j)
-
     await drone.mission_raw.upload_mission(first_mission_items)
     
     async for arm_state in drone.telemetry.armed():
@@ -127,17 +79,6 @@ async def main():
             await drone.action.arm()
         break
     
-    await drone.mission_raw.start_mission()
-
-    async for p in getPass():
-        if p:
-            print("Phase 2")
-            break
-
-    await asyncio.sleep(4.0)
-
-    await drone.mission_raw.upload_mission(second_mission_items)
-
     await drone.mission_raw.start_mission()
 
     await termination_task
