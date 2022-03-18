@@ -56,7 +56,7 @@ position = None
 flight_mode = ""
 async def main():
     global sroi
-    GPIO.setmode(GPIO.BOARD)
+    GPIO.setmode(GPIO.BCM)
     GPIO.setup(PIN, GPIO.OUT)
     GPIO.output(PIN, False)
     drone = System()

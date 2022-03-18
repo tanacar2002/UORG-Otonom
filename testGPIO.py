@@ -4,7 +4,7 @@ import RPi.GPIO as GPIO
 import time
 PIN = 12
 
-GPIO.setmode(GPIO.BOARD)
+GPIO.setmode(GPIO.BCM)
 GPIO.setup(PIN, GPIO.OUT)
 try:
     while True:
