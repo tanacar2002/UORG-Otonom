@@ -8,7 +8,7 @@ import RPi.GPIO as GPIO
 W-------E
  180|270
 """ 
-angle = 0 * m.pi / 180 #Angle from North to West
+angle = (360-342) * m.pi / 180 #Angle from North to West
 pts1 =[(0,0,2)
         ,(0,0,7)
         ,(0,5,7)
@@ -38,16 +38,16 @@ pts2 =[*triangle,*triangle,*triangle,*triangle,*triangle
         ,*triangle,*triangle
         ,(0,0,5)]
 
-fpoints = []
-spoints = []
-#stay away from the walls
-for point in pts1:
-    npoint = (point[0]+2.5,point[1]+2.5,point[2])
-    fpoints.append(npoint)
+fpoints = pts1
+spoints = pts2
+# #stay away from the walls
+# for point in pts1:
+#     npoint = (point[0]+2.5,point[1]+2.5,point[2])
+#     fpoints.append(npoint)
 
-for point in pts2:
-    npoint = (point[0]+2.5,point[1]+2.5,point[2])
-    spoints.append(npoint)
+# for point in pts2:
+#     npoint = (point[0]+2.5,point[1]+2.5,point[2])
+#     spoints.append(npoint)
 
 first_mission_items = []
 f_mis_complete = False
@@ -93,53 +93,44 @@ async def main():
     termination_task = asyncio.ensure_future(
         observe_is_in_air(drone, running_tasks))
     
-    async for param in getParam(drone):
-        if (param >= 2.5):# or True:# for sim
-            print("Phase 1")
-            break
+    # async for param in getParam(drone):
+    #     if (param >= 2.5):# or True:# for sim
+    #         print("Phase 1")
+    #         break
     #If we want to have the coordinates from the start cmd
     # async for pos in drone.telemetry.position():
     #     global position
     #     position = pos
     #     print(pos)
     #     break
-
+    j = 0
     for i,point in enumerate(fpoints):
-        add_WP(first_mission_items,point[0]*m.cos(angle)-point[1]*m.sin(angle),point[1]*m.cos(angle)+point[0]*m.sin(angle),point[2],i)
+        add_WP(first_mission_items,point[0]*m.cos(angle)-point[1]*m.sin(angle),point[1]*m.cos(angle)+point[0]*m.sin(angle),point[2],j)
+        j += 1
 
-    add_ROI(second_mission_items,sroi[0]*m.cos(angle)-sroi[1]*m.sin(angle),sroi[1]*m.cos(angle)+sroi[0]*m.sin(angle),sroi[2],0)
+    add_Wait(first_mission_items,spoints[0][0]*m.cos(angle)-spoints[0][1]*m.sin(angle),spoints[0][1]*m.cos(angle)+spoints[0][0]*m.sin(angle),spoints[0][2],j)
+    j += 1
+    add_ROI(first_mission_items,sroi[0]*m.cos(angle)-sroi[1]*m.sin(angle),sroi[1]*m.cos(angle)+sroi[0]*m.sin(angle),sroi[2],j)
     #add_LimSpeed(second_mission_items,0.5,1)
-    j = 1
+    j += 1
     for point in spoints:
-            add_WP(second_mission_items,point[0]*m.cos(angle)-point[1]*m.sin(angle),point[1]*m.cos(angle)+point[0]*m.sin(angle),point[2],j)
+            add_WP(first_mission_items,point[0]*m.cos(angle)-point[1]*m.sin(angle),point[1]*m.cos(angle)+point[0]*m.sin(angle),point[2],j)
             j += 1
             k = ((j//2)%3)-1
             sroi = rois[k]  
-            add_ROI(second_mission_items,sroi[0]*m.cos(angle)-sroi[1]*m.sin(angle),sroi[1]*m.cos(angle)+sroi[0]*m.sin(angle),sroi[2],j)
+            add_ROI(first_mission_items,sroi[0]*m.cos(angle)-sroi[1]*m.sin(angle),sroi[1]*m.cos(angle)+sroi[0]*m.sin(angle),sroi[2],j)
             j += 1
 
-    add_LAND(second_mission_items,spoints[-1][0]*m.cos(angle)-spoints[-1][1]*m.sin(angle),spoints[-1][1]*m.cos(angle)+spoints[-1][0]*m.sin(angle),spoints[-1][2],j)
-
+    add_LAND(first_mission_items,spoints[-1][0]*m.cos(angle)-spoints[-1][1]*m.sin(angle),spoints[-1][1]*m.cos(angle)+spoints[-1][0]*m.sin(angle),spoints[-1][2],j)
+    
+    # async for arm_state in drone.telemetry.armed():
+    #     if arm_state:
+    #         print("Phase 1")
+    #         #await drone.action.arm()
+    #         break
+    
     await drone.mission_raw.upload_mission(first_mission_items)
-    
-    async for arm_state in drone.telemetry.armed():
-        if not arm_state:
-            await drone.action.arm()
-        break
-    
-    await drone.mission_raw.start_mission()
-
-    async for p in getPass():
-        if p:
-            print("Phase 2")
-            break
-
-    await asyncio.sleep(4.0)
-
-    await drone.mission_raw.upload_mission(second_mission_items)
-
-    await drone.mission_raw.start_mission()
-
+    print("Mission Uploaded!")
     await termination_task
 
     GPIO.cleanup()
@@ -178,6 +169,13 @@ def correct_longitude(long,lat):
 def add_WP(l,x,y,z,seq):
     l.append(mr.MissionItem(seq,6,16,0 if seq else 1,1,#mav_cmd_nav_waypoint
                             0.3,0.5,0,float("nan"),
+                            int((position.latitude_deg + meter_to_degree(y))*1e7),
+                            int((position.longitude_deg + correct_longitude(meter_to_degree(x),position.latitude_deg))*1e7),
+                            z,0))
+
+def add_Wait(l,x,y,z,seq):
+    l.append(mr.MissionItem(seq,6,19,0 if seq else 1,1,#mav_cmd_nav_waypoint
+                            4.0,0,float("nan"),float("nan"),
                             int((position.latitude_deg + meter_to_degree(y))*1e7),
                             int((position.longitude_deg + correct_longitude(meter_to_degree(x),position.latitude_deg))*1e7),
                             z,0))

@@ -19,6 +19,7 @@ first_mission_items = []
 f_mis_complete = False
 position = None
 flight_mode = ""
+parameter = 0
 async def main():
     global sroi
     GPIO.setmode(GPIO.BCM)
@@ -36,17 +37,19 @@ async def main():
 
     GPIO.output(PIN, True)
     
+    """
     print("Waiting for global position estimate")
     async for health in drone.telemetry.health():
         if health.is_global_position_ok:
             print("GPS working")
             break
-
+    """
     async for pos in drone.telemetry.position():
         global position
         position = pos
         print(pos)
         break
+    
 
     print_mission_progress_task = asyncio.ensure_future(
         print_mission_progress(drone))
@@ -54,14 +57,18 @@ async def main():
     f_mode_task = asyncio.ensure_future(
         flight_mode_handler(drone))
 
+    # param_task = asyncio.ensure_future(
+    #     param_handler(drone))
+
     running_tasks = [print_mission_progress_task,f_mode_task]
     termination_task = asyncio.ensure_future(
         observe_is_in_air(drone, running_tasks))
     
-    async for param in getParam(drone):
-        if (param >= 2.5):# or True:# for sim
-            print("Phase 1")
-            break
+    # async for param in getParam(drone):
+    #     print(param)
+    #     if (param >= 2.5):# or True:# for sim
+    #         print("Phase 1")
+    #         break
     #If we want to have the coordinates from the start cmd
     # async for pos in drone.telemetry.position():
     #     global position
@@ -72,12 +79,13 @@ async def main():
     for i,point in enumerate(fpoints):
         add_WP(first_mission_items,point[0]*m.cos(angle)-point[1]*m.sin(angle),point[1]*m.cos(angle)+point[0]*m.sin(angle),point[2],i)
     add_LAND(first_mission_items,fpoints[-1][0]*m.cos(angle)-fpoints[-1][1]*m.sin(angle),fpoints[-1][1]*m.cos(angle)+fpoints[-1][0]*m.sin(angle),fpoints[-1][2],3)
-    await drone.mission_raw.upload_mission(first_mission_items)
     
     async for arm_state in drone.telemetry.armed():
-        if not arm_state:
-            await drone.action.arm()
-        break
+        if arm_state:
+            print("Phase 1")
+            break
+    
+    await drone.mission_raw.upload_mission(first_mission_items)
     
     await drone.mission_raw.start_mission()
 
@@ -85,20 +93,19 @@ async def main():
 
     GPIO.cleanup()
 
-async def getParam(drone):
-    while True:
-        await asyncio.sleep(0.1)
-        yield await drone.param.get_param_float("MIS_TAKEOFF_ALT")
-
-
 async def getPass():
     while True:
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(0.4)
         yield f_mis_complete
+
+async def getParam(drone):
+    while True:
+        await asyncio.sleep(0.4)
+        yield await drone.param.get_param_float("MIS_TAKEOFF_ALT")
 
 async def getFlightMode():
     while True:
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(0.4)
         yield flight_mode
 
 async def print_mission_progress(drone):
@@ -123,6 +130,13 @@ def add_WP(l,x,y,z,seq):
                             int((position.longitude_deg + correct_longitude(meter_to_degree(x),position.latitude_deg))*1e7),
                             z,0))
 
+def add_Wait(l,x,y,z,seq):
+    l.append(mr.MissionItem(seq,6,19,0 if seq else 1,1,#mav_cmd_nav_waypoint
+                            4.0,0,float("nan"),float("nan"),
+                            int((position.latitude_deg + meter_to_degree(y))*1e7),
+                            int((position.longitude_deg + correct_longitude(meter_to_degree(x),position.latitude_deg))*1e7),
+                            z,0))
+                            
 def add_ROI(l,x,y,z,seq):
     l.append(mr.MissionItem(seq,6,195,0 if seq else 1,1,
                             0,float("nan"),float("nan"),float("nan"),
@@ -146,6 +160,12 @@ async def flight_mode_handler(drone):
     async for f_mode in drone.telemetry.flight_mode():
         global flight_mode
         flight_mode = f_mode
+
+async def param_handler(drone):
+    async for param in drone.param.get_param_float("MIS_TAKEOFF_ALT"):
+        global parameter
+        print(parameter)
+        parameter = param
 
 async def observe_is_in_air(drone, running_tasks):
     """ Monitors whether the drone is flying or not and
