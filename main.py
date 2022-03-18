@@ -168,7 +168,7 @@ def correct_longitude(long,lat):
 
 def add_WP(l,x,y,z,seq):
     l.append(mr.MissionItem(seq,6,16,0 if seq else 1,1,#mav_cmd_nav_waypoint
-                            0.3,0.5,0,float("nan"),
+                            0.3,1.2,0,float("nan"),
                             int((position.latitude_deg + meter_to_degree(y))*1e7),
                             int((position.longitude_deg + correct_longitude(meter_to_degree(x),position.latitude_deg))*1e7),
                             z,0))
