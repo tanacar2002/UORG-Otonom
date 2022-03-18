@@ -71,7 +71,7 @@ async def main():
 
     for i,point in enumerate(fpoints):
         add_WP(first_mission_items,point[0]*m.cos(angle)-point[1]*m.sin(angle),point[1]*m.cos(angle)+point[0]*m.sin(angle),point[2],i)
-
+    add_LAND(first_mission_items,fpoints[-1][0]*m.cos(angle)-fpoints[-1][1]*m.sin(angle),fpoints[-1][1]*m.cos(angle)+fpoints[-1][0]*m.sin(angle),fpoints[-1][2],3)
     await drone.mission_raw.upload_mission(first_mission_items)
     
     async for arm_state in drone.telemetry.armed():
