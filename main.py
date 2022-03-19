@@ -5,7 +5,7 @@ from mavsdk import mission_raw as mr
 import RPi.GPIO as GPIO
 """ N
  90 | 0
-W-------E
+W---|---E
  180|270
 """ 
 angle = (360-342) * m.pi / 180 #Angle from North to West
