@@ -34,8 +34,7 @@ rois = [(15/4,5*m.sqrt(3)/12,5)
 triangle = [(0,0,5)
         ,(5/2,5*m.sqrt(3)/2,5)
         ,(5,0,5)]
-pts2 =[*triangle,*triangle,*triangle,*triangle,*triangle
-        ,*triangle,*triangle
+pts2 =[*triangle,*triangle,*triangle
         ,(0,0,5)]
 
 fpoints = pts1
